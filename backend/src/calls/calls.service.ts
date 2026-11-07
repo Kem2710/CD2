@@ -24,10 +24,11 @@ export class CallsService {
     private config: ConfigService,
   ) {}
 
-  // Lưu record rồi gọi webhook n8n
+  // Lưu record rồi gọi webhook n8n (luồng Summary)
   async createAndDispatch(
     file: Express.Multer.File,
     body: { customerName?: string; phone?: string },
+    runSummary = true,
   ) {
     const call = await this.callRepo.save(
       this.callRepo.create({
@@ -37,6 +38,12 @@ export class CallsService {
         status: 'PENDING',
       }),
     );
+
+    if (!runSummary) {
+      // Trạng thái từng luồng khác nằm ở bảng analyses
+      call.status = 'DONE';
+      return this.callRepo.save(call);
+    }
 
     const base = this.config.get<string>('PUBLIC_BACKEND_URL');
     try {
@@ -48,7 +55,7 @@ export class CallsService {
         },
         body: JSON.stringify({
           callId: call.id,
-          audioUrl: `${base}/uploads/${file.filename}`,
+          audioUrl: `${base}/uploads/${call.audioFilename}`,
           callbackUrl: `${base}/calls/${call.id}/result`,
           customerName: call.customerName,
           phone: call.phone,

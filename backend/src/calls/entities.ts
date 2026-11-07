@@ -24,7 +24,7 @@ export class Call {
   @Column({ type: 'text', nullable: true })
   error: string | null;
 
-  @CreateDateColumn({ type: 'timestamp with time zone' })
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }
 

@@ -9,6 +9,7 @@ import { randomBytes } from 'crypto';
 import { mkdirSync } from 'fs';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { AnalysesService } from '../analyses/analyses.service';
 import { CallsService } from './calls.service';
 import type { ResultPayload } from './calls.service';
 
@@ -17,15 +18,16 @@ export class CallsController {
   constructor(
     private readonly calls: CallsService,
     private readonly config: ConfigService,
+    private readonly analyses: AnalysesService,
   ) {}
 
   private checkSecret(secret?: string) {
-    if (secret !== this.config.get('WEBHOOK_SECRET')) {
+    if (secret !== this.config.get<string>('WEBHOOK_SECRET')) {
       throw new UnauthorizedException('Sai webhook secret');
     }
   }
 
-  // Frontend upload audio
+  // Frontend upload audio. flows: summary, quality, complaint, lead
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
@@ -35,17 +37,33 @@ export class CallsController {
           cb(null, 'uploads');
         },
         filename: (_req, file, cb) =>
-          cb(null, `${Date.now()}-${randomBytes(4).toString('hex')}${extname(file.originalname)}`),
+          cb(
+            null,
+            `${Date.now()}-${randomBytes(4).toString('hex')}${extname(file.originalname)}`,
+          ),
       }),
       limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
     }),
   )
-  upload(
+  async upload(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { customerName?: string; phone?: string },
+    @Body()
+    body: { customerName?: string; phone?: string; flows?: string | string[] },
   ) {
     if (!file) throw new BadRequestException('Thiếu file audio (field "file")');
-    return this.calls.createAndDispatch(file, body);
+
+    const raw = Array.isArray(body.flows)
+      ? body.flows
+      : (body.flows ?? 'summary').split(',');
+    const flows = raw.map((s) => s.trim()).filter(Boolean);
+
+    const call = await this.calls.createAndDispatch(
+      file,
+      body,
+      flows.includes('summary'),
+    );
+    await this.analyses.dispatch(call, flows);
+    return call;
   }
 
   @Get()
@@ -58,7 +76,7 @@ export class CallsController {
     return this.calls.findOne(id);
   }
 
-  // n8n gọi về khi xử lý xong
+  // n8n gọi về khi xử lý xong (luồng Summary)
   @Post(':id/result')
   result(
     @Param('id', ParseIntPipe) id: number,
@@ -69,7 +87,7 @@ export class CallsController {
     return this.calls.saveResult(id, body);
   }
 
-  // n8n gọi về khi xử lý lỗi
+  // n8n gọi về khi xử lý lỗi (luồng Summary)
   @Post(':id/fail')
   fail(
     @Param('id', ParseIntPipe) id: number,
