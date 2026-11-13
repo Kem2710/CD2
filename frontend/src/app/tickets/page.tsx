@@ -17,13 +17,15 @@ export default function TicketsPage() {
   const [tab, setTab] = useState("ALL");
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      setTickets(await getTickets());
-      setError("");
-    } catch {
-      setError("Không kết nối được backend.");
-    }
+  const load = useCallback(() => {
+    return getTickets()
+      .then((result) => {
+        setTickets(result);
+        setError("");
+      })
+      .catch(() => {
+        setError("Không kết nối được backend.");
+      });
   }, []);
 
   useEffect(() => {

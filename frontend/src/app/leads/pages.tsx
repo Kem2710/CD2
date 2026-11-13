@@ -9,13 +9,15 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      setLeads(await getLeads());
-      setError("");
-    } catch {
-      setError("Không kết nối được backend.");
-    }
+  const load = useCallback(() => {
+    return getLeads()
+      .then((result) => {
+        setLeads(result);
+        setError("");
+      })
+      .catch(() => {
+        setError("Không kết nối được backend.");
+      });
   }, []);
 
   useEffect(() => {

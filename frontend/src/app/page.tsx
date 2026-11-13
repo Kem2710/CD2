@@ -47,16 +47,17 @@ export default function Dashboard() {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      const [s, c, a] = await Promise.all([getStats(), getCalls(), getAnalyses()]);
-      setStats(s);
-      setCalls(c);
-      setAnalyses(a);
-      setError("");
-    } catch {
-      setError("Không kết nối được backend (http://localhost:3001). Hãy kiểm tra NestJS đang chạy.");
-    }
+  const load = useCallback(() => {
+    return Promise.all([getStats(), getCalls(), getAnalyses()])
+      .then(([s, c, a]) => {
+        setStats(s);
+        setCalls(c);
+        setAnalyses(a);
+        setError("");
+      })
+      .catch(() => {
+        setError("Không kết nối được backend (http://localhost:3001). Hãy kiểm tra NestJS đang chạy.");
+      });
   }, []);
 
   useEffect(() => {

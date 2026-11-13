@@ -14,15 +14,16 @@ export default function CallsPage() {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      const [c, a] = await Promise.all([getCalls(), getAnalyses()]);
-      setCalls(c);
-      setAnalyses(a);
-      setError("");
-    } catch {
-      setError("Không kết nối được backend (http://localhost:3001). Hãy kiểm tra NestJS đang chạy.");
-    }
+  const load = useCallback(() => {
+    return Promise.all([getCalls(), getAnalyses()])
+      .then(([c, a]) => {
+        setCalls(c);
+        setAnalyses(a);
+        setError("");
+      })
+      .catch(() => {
+        setError("Không kết nối được backend (http://localhost:3001). Hãy kiểm tra NestJS đang chạy.");
+      });
   }, []);
 
   useEffect(() => {

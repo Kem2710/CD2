@@ -126,15 +126,16 @@ export default function CallView({ id }: { id: string }) {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      const [c, a] = await Promise.all([getCall(id), getAnalyses(Number(id))]);
-      setCall(c);
-      setAnalyses(a);
-      setError("");
-    } catch {
-      setError("Không tải được cuộc gọi này.");
-    }
+  const load = useCallback(() => {
+    return Promise.all([getCall(id), getAnalyses(Number(id))])
+      .then(([c, a]) => {
+        setCall(c);
+        setAnalyses(a);
+        setError("");
+      })
+      .catch(() => {
+        setError("Không tải được cuộc gọi này.");
+      });
   }, [id]);
 
   useEffect(() => {
