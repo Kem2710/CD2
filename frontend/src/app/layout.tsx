@@ -1,25 +1,25 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Inter } from "next/font/google";
+import Sidebar from "@/components/Sidebar";
 import "./globals.css";
 
+const inter = Inter({ subsets: ["latin", "vietnamese"] });
+
 export const metadata: Metadata = {
-  title: "AI Call Summary Agent",
-  description: "Tóm tắt cuộc gọi tự động bằng n8n + Gemini",
+  title: "Voice AI & Call Automation",
+  description: "Phân tích cuộc gọi tự động bằng n8n + Gemini",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
-        <header className="border-b bg-white">
-          <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-            <Link href="/" className="text-lg font-semibold">
-              AI Call Summary Agent
-            </Link>
-            <span className="text-sm text-gray-500">n8n · NestJS · Next.js · PostgreSQL</span>
-          </div>
-        </header>
-        <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <body className={`${inter.className} bg-slate-50 text-slate-900 antialiased`}>
+        <div className="flex min-h-screen flex-col md:flex-row">
+          <Sidebar />
+          <main className="min-w-0 flex-1 p-4 md:p-8">
+            <div className="mx-auto max-w-6xl">{children}</div>
+          </main>
+        </div>
       </body>
     </html>
   );

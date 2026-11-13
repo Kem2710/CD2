@@ -1,41 +1,56 @@
-const STATUS: Record<string, string> = {
-  PENDING: "bg-gray-100 text-gray-700",
-  PROCESSING: "bg-amber-100 text-amber-800",
-  DONE: "bg-green-100 text-green-800",
-  FAILED: "bg-red-100 text-red-800",
+const pill = "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium";
+
+const STATUS: Record<string, [string, string]> = {
+  PENDING: ["Chờ xử lý", "bg-slate-100 text-slate-700"],
+  PROCESSING: ["Đang xử lý", "bg-amber-100 text-amber-800"],
+  DONE: ["Hoàn tất", "bg-emerald-100 text-emerald-800"],
+  FAILED: ["Lỗi", "bg-rose-100 text-rose-800"],
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Chờ xử lý",
-  PROCESSING: "Đang xử lý",
-  DONE: "Hoàn tất",
-  FAILED: "Lỗi",
+const SENTIMENT: Record<string, [string, string]> = {
+  positive: ["Tích cực", "bg-emerald-100 text-emerald-800"],
+  neutral: ["Trung lập", "bg-slate-100 text-slate-700"],
+  negative: ["Tiêu cực", "bg-rose-100 text-rose-800"],
 };
 
-const SENTIMENT: Record<string, string> = {
-  positive: "bg-green-100 text-green-800",
-  neutral: "bg-gray-100 text-gray-700",
-  negative: "bg-red-100 text-red-800",
+const PRIORITY: Record<string, [string, string]> = {
+  low: ["Thấp", "bg-slate-100 text-slate-700"],
+  medium: ["Trung bình", "bg-sky-100 text-sky-800"],
+  high: ["Cao", "bg-amber-100 text-amber-800"],
+  urgent: ["Khẩn cấp", "bg-rose-100 text-rose-800"],
 };
 
-const SENTIMENT_LABEL: Record<string, string> = {
-  positive: "Tích cực",
-  neutral: "Trung lập",
-  negative: "Tiêu cực",
+const STAGE: Record<string, [string, string]> = {
+  hot: ["Nóng", "bg-rose-100 text-rose-800"],
+  warm: ["Ấm", "bg-amber-100 text-amber-800"],
+  cold: ["Lạnh", "bg-sky-100 text-sky-800"],
 };
 
-export function StatusBadge({ status }: { status: string }) {
-  return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS[status] ?? STATUS.PENDING}`}>
-      {STATUS_LABEL[status] ?? status}
-    </span>
-  );
+function Badge({ map, value }: { map: Record<string, [string, string]>; value: string }) {
+  const [label, cls] = map[value] ?? [value, "bg-slate-100 text-slate-700"];
+  return <span className={`${pill} ${cls}`}>{label}</span>;
 }
 
-export function SentimentBadge({ sentiment }: { sentiment: string }) {
+export const StatusBadge = ({ status }: { status: string }) => <Badge map={STATUS} value={status} />;
+export const SentimentBadge = ({ sentiment }: { sentiment: string }) => (
+  <Badge map={SENTIMENT} value={sentiment} />
+);
+export const PriorityBadge = ({ priority }: { priority: string }) => (
+  <Badge map={PRIORITY} value={priority} />
+);
+export const StageBadge = ({ stage }: { stage: string }) => <Badge map={STAGE} value={stage} />;
+
+const FLOW_DOT: Record<string, string> = {
+  DONE: "bg-emerald-500",
+  PROCESSING: "bg-amber-500 animate-pulse",
+  FAILED: "bg-rose-500",
+};
+
+export function FlowChip({ label, status }: { label: string; status: string }) {
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${SENTIMENT[sentiment] ?? SENTIMENT.neutral}`}>
-      {SENTIMENT_LABEL[sentiment] ?? sentiment}
+    <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+      <span className={`h-1.5 w-1.5 rounded-full ${FLOW_DOT[status] ?? "bg-slate-400"}`} />
+      {label}
     </span>
   );
 }
