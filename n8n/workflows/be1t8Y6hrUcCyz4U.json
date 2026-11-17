@@ -1,0 +1,270 @@
+{
+  "updatedAt": "2026-11-09T07:36:36.795Z",
+  "createdAt": "2026-11-09T06:52:11.192Z",
+  "id": "be1t8Y6hrUcCyz4U",
+  "name": "Call Lead",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "call-lead",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        176
+      ],
+      "id": "32fdb5ae-77c2-429b-b668-4dc7fd696386",
+      "name": "Webhook",
+      "webhookId": "78ea2475-3313-4ce6-a291-6791ceced446"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.audioUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        176
+      ],
+      "id": "bbf38e8c-771f-4344-b571-e4deb9115b74",
+      "name": "Download Audio"
+    },
+    {
+      "parameters": {
+        "jsCode": "const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst b64 = buf.toString('base64');\nconst mime = $input.first().binary.data.mimeType || 'audio/mpeg';\nconst today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });\n\nconst prompt = `Bạn là chuyên viên đánh giá khách hàng tiềm năng (lead) từ cuộc gọi bán hàng.\nHãy nghe file audio và chấm điểm khách hàng dựa trên 4 yếu tố: ý định mua, ngân sách, thời gian quyết định, quyền quyết định.\nTrả về DUY NHẤT một JSON, không giải thích thêm, gồm các khóa:\n- name: tên khách nếu nghe được, nếu không thì null\n- phone: số điện thoại nếu khách nêu, nếu không thì null\n- interest: khách quan tâm sản phẩm hoặc dịch vụ gì (1-2 câu tiếng Việt)\n- score: điểm tiềm năng từ 0 đến 100 (số nguyên)\n- notes: bước tiếp theo nên làm với khách này (1-2 câu tiếng Việt)\nHôm nay là ${today}.\nNếu audio không có lời thoại, đặt score = 0 và notes ghi \"Không có lời thoại\".`;\n\nreturn [{\n  json: {\n    requestBody: {\n      contents: [{ parts: [\n        { inline_data: { mime_type: mime, data: b64 } },\n        { text: prompt },\n      ]}],\n      generationConfig: { responseMimeType: 'application/json' },\n    },\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "5c96e2b9-2cac-4783-bf70-2ab5fc12b452",
+      "name": "Build Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "fd426053-a9d4-4ab9-abcf-c19e3f74b79f",
+      "name": "Gemini",
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "oBkVroe3yfT0Plx0",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';\nlet data;\ntry {\n  data = JSON.parse(raw.replace(/```json|```/g, '').trim());\n} catch (e) {\n  throw new Error('Gemini trả JSON không hợp lệ: ' + raw.slice(0, 200));\n}\nif (Array.isArray(data)) data = data[0] ?? {};\nconst hook = $('Webhook').first().json.body;\nreturn [{ json: { callbackUrl: hook.callbackUrl, payload: data } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "0488451f-863a-4791-9e85-2d6183808e03",
+      "name": "Parse Result"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "chuoi-bi-mat-cua-ban"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "5686fe8c-7838-444d-986f-eef7f9ba2ea4",
+      "name": "Send to NestJS"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Webhook').first().json.body.failUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "chuoi-bi-mat-cua-ban"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { error: 'Gemini lỗi: ' + ($json.error?.message ?? 'không rõ') } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        848,
+        224
+      ],
+      "id": "91385e3b-7df9-4394-8416-2fb8880be447",
+      "name": "Report Failure"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        144
+      ],
+      "id": "86a9ff8e-de34-41e4-9fef-96b73efd1c21",
+      "name": "Sticky Note"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Request": {
+      "main": [
+        [
+          {
+            "node": "Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "main": [
+        [
+          {
+            "node": "Parse Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Result": {
+      "main": [
+        [
+          {
+            "node": "Send to NestJS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Build Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "e611f285-4ae0-44c9-987e-9c9f37b14979",
+  "activeVersionId": "4ec732e6-2a78-4926-81b7-2d43c3459b49",
+  "versionCounter": 5,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-11-09T06:52:11.202Z",
+      "createdAt": "2026-11-09T06:52:11.202Z",
+      "role": "workflow:owner",
+      "workflowId": "be1t8Y6hrUcCyz4U",
+      "projectId": "qSZsFri5kzXBaLpv",
+      "project": {
+        "updatedAt": "2026-11-01T18:16:21.730Z",
+        "createdAt": "2026-11-01T17:47:18.404Z",
+        "id": "qSZsFri5kzXBaLpv",
+        "name": "Hue Le Duc <lehueks123@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "34cd93e3-cbf4-45f2-a6c5-2cfae0ecf8c4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

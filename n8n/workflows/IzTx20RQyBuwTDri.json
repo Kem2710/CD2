@@ -1,0 +1,270 @@
+{
+  "updatedAt": "2026-11-09T07:35:53.987Z",
+  "createdAt": "2026-11-01T18:28:46.455Z",
+  "id": "IzTx20RQyBuwTDri",
+  "name": "Call Summary Agent",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "call-summary",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        176
+      ],
+      "id": "c9f88b98-4c0d-45ae-ab44-1b9f4c5365c7",
+      "name": "Webhook",
+      "webhookId": "30ad21eb-5be9-4d4d-ab5f-6fbeac8a1f16"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.audioUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        176
+      ],
+      "id": "d9655380-ef51-4cda-a0b7-57dc3fae0b6d",
+      "name": "Download Audio"
+    },
+    {
+      "parameters": {
+        "jsCode": "const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst b64 = buf.toString('base64');\nconst hook = $('Webhook').first().json.body;\nconst mime = $input.first().binary.data.mimeType || 'audio/mpeg';\n\nconst prompt = `Bạn là trợ lý phân tích cuộc gọi chăm sóc khách hàng.\nHãy nghe file audio và trả về DUY NHẤT một JSON với các khóa:\n- transcript: toàn bộ lời thoại (ghi rõ người nói nếu phân biệt được)\n- language: mã ngôn ngữ, ví dụ \"vi\" hoặc \"en\"\n- summary: tóm tắt 2-4 câu bằng tiếng Việt\n- sentiment: \"positive\", \"neutral\" hoặc \"negative\"\n- keywords: mảng 3-6 từ khóa\n- action_items: mảng các object {task, owner, due_date}, due_date dạng YYYY-MM-DD hoặc null\nHôm nay là ${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })}. Nếu audio không có lời thoại, để transcript rỗng và summary ghi \"Không có lời thoại\".`;\n\nreturn [{\n  json: {\n    requestBody: {\n      contents: [{ parts: [\n        { inline_data: { mime_type: mime, data: b64 } },\n        { text: prompt },\n      ]}],\n      generationConfig: { responseMimeType: 'application/json' },\n    },\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "d48da132-af71-4a5c-a633-b72989a93314",
+      "name": "Build Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "8807f8b2-b3a4-4f58-a56a-75499d745d18",
+      "name": "Gemini",
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "oBkVroe3yfT0Plx0",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';\nlet data;\ntry {\n  data = JSON.parse(raw.replace(/```json|```/g, '').trim());\n} catch (e) {\n  throw new Error('Gemini trả JSON không hợp lệ: ' + raw.slice(0, 200));\n}\nif (Array.isArray(data)) data = data[0] ?? {};\nconst hook = $('Webhook').first().json.body;\nreturn [{ json: { callbackUrl: hook.callbackUrl, payload: data } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "8982fffc-ef12-484b-a726-46d0d3d7dc44",
+      "name": "Parse Result"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "chuoi-bi-mat-cua-ban"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "b06e184b-1026-465a-b1e0-1bd1c9e4d0bb",
+      "name": "Send to NestJS"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Webhook').first().json.body.callbackUrl.replace('/result', '/fail') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "chuoi-bi-mat-cua-ban"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { error: 'Gemini lỗi: ' + ($json.error?.message ?? 'không rõ') } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        848,
+        224
+      ],
+      "id": "57fdadbc-f7a4-45d4-a586-a434acaf2c4e",
+      "name": "Report Failure"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        144
+      ],
+      "id": "e7852d20-4288-4407-8486-936630a8cfdc",
+      "name": "Sticky Note"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Request": {
+      "main": [
+        [
+          {
+            "node": "Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "main": [
+        [
+          {
+            "node": "Parse Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Result": {
+      "main": [
+        [
+          {
+            "node": "Send to NestJS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Build Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "ffcff70a-ee7e-4797-bc59-4ee393c890d5",
+  "activeVersionId": "ffcff70a-ee7e-4797-bc59-4ee393c890d5",
+  "versionCounter": 12,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-11-01T18:28:46.470Z",
+      "createdAt": "2026-11-01T18:28:46.470Z",
+      "role": "workflow:owner",
+      "workflowId": "IzTx20RQyBuwTDri",
+      "projectId": "qSZsFri5kzXBaLpv",
+      "project": {
+        "updatedAt": "2026-11-01T18:16:21.730Z",
+        "createdAt": "2026-11-01T17:47:18.404Z",
+        "id": "qSZsFri5kzXBaLpv",
+        "name": "Hue Le Duc <lehueks123@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "34cd93e3-cbf4-45f2-a6c5-2cfae0ecf8c4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version ffcff70a",
+    "description": ""
+  }
+}
